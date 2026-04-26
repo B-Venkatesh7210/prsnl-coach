@@ -28,6 +28,14 @@ export default function App() {
           confessions: loaded.confessions ?? [],
           lockIn: loaded.lockIn ?? false,
           tomorrowAdjustments: loaded.tomorrowAdjustments ?? [],
+          dailyStats: loaded.dailyStats ?? {},
+          lastDiet: loaded.lastDiet ?? null,
+          groceryList: loaded.groceryList ?? [],
+          currentWeightKg:
+            loaded.currentWeightKg === undefined
+              ? null
+              : loaded.currentWeightKg,
+          lastWeeklyReport: loaded.lastWeeklyReport ?? null,
         });
       } else {
         const fresh = generateDailyTasks();
@@ -38,6 +46,11 @@ export default function App() {
           confessions: [],
           lockIn: false,
           tomorrowAdjustments: [],
+          dailyStats: {},
+          lastDiet: null,
+          groceryList: [],
+          currentWeightKg: null,
+          lastWeeklyReport: null,
         });
         await saveTasksToStorage({
           tasks: fresh,
@@ -46,6 +59,11 @@ export default function App() {
           confessions: [],
           lockIn: false,
           tomorrowAdjustments: [],
+          dailyStats: {},
+          lastDiet: null,
+          groceryList: [],
+          currentWeightKg: null,
+          lastWeeklyReport: null,
         });
       }
       setReady(true);
@@ -65,6 +83,11 @@ export default function App() {
         confessions: state.confessions,
         lockIn: state.lockIn,
         tomorrowAdjustments: state.tomorrowAdjustments,
+        dailyStats: state.dailyStats,
+        lastDiet: state.lastDiet,
+        groceryList: state.groceryList,
+        currentWeightKg: state.currentWeightKg,
+        lastWeeklyReport: state.lastWeeklyReport,
       });
     });
   }, [ready]);

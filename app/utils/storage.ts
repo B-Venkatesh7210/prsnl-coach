@@ -1,5 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import type { ConfessionEntry } from '../types/ai';
+import type { ConfessionEntry, DietPlan } from '../types/ai';
+import type { DayStat, GroceryListRow, WeeklyReport } from '../types/weekly';
 import type { Task } from '../types/task';
 
 const KEY = 'TASKS';
@@ -11,6 +12,11 @@ export interface PersistedTaskState {
   confessions?: ConfessionEntry[];
   lockIn?: boolean;
   tomorrowAdjustments?: string[];
+  dailyStats?: Record<string, DayStat>;
+  lastDiet?: DietPlan | null;
+  groceryList?: GroceryListRow[];
+  currentWeightKg?: number | null;
+  lastWeeklyReport?: WeeklyReport | null;
 }
 
 /**

@@ -11,9 +11,13 @@ import {
 } from 'react-native';
 import dayjs from 'dayjs';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
+import { CravingModal } from '../components/CravingModal';
 import { TaskCard } from '../components/TaskCard';
 import { ConfessionModal } from '../components/ConfessionModal';
+import { CalendarScreen } from './CalendarScreen';
 import { CoachScreen } from './CoachScreen';
+import { GroceryScreen } from './GroceryScreen';
+import { WeeklyReportScreen } from './WeeklyReportScreen';
 import { generateNextDayDiet } from '../services/aiService';
 import {
   cancelAllNotifications,
@@ -94,12 +98,17 @@ function buildCompletionContext(): {
 }
 
 export function HomeScreen() {
-  const [view, setView] = useState<'home' | 'coach'>('home');
+  const [view, setView] = useState<
+    'home' | 'coach' | 'calendar' | 'weekly' | 'grocery'
+  >('home');
   const tasks = useTaskStore((s) => s.tasks);
   const completedTasks = useTaskStore((s) => s.completedTasks);
   const missedTasks = useTaskStore((s) => s.missedTasks);
   const tomorrowAdjustments = useTaskStore((s) => s.tomorrowAdjustments);
   const addConfession = useTaskStore((s) => s.addConfession);
+  const setLastDiet = useTaskStore((s) => s.setLastDiet);
+  const setCompletion = useTaskStore((s) => s.setCompletion);
+  const [craveOpen, setCraveOpen] = useState(false);
 
   const sections = useMemo(
     () => buildSections(tasks, completedTasks, missedTasks),
@@ -127,6 +136,16 @@ export function HomeScreen() {
     };
   }, [tasks]);
 
+  const todayKey = dayjs().format('YYYY-MM-DD');
+  useEffect(() => {
+    const st = useTaskStore.getState();
+    if (st.dailyStats[todayKey]?.isLeave) return;
+    const tot = st.tasks.length + st.completedTasks.length + st.missedTasks.length;
+    if (tot === 0) return;
+    const pct = Math.round((100 * st.completedTasks.length) / tot);
+    setCompletion(todayKey, pct, st.completedTasks.length);
+  }, [tasks, completedTasks, missedTasks, setCompletion, todayKey]);
+
   const handleConfessionSubmit = (payload: {
     type: string;
     details: string;
@@ -138,6 +157,7 @@ export function HomeScreen() {
       const ctx = buildCompletionContext();
       const result = await generateNextDayDiet(ctx);
       setTomorrowPlan(result);
+      setLastDiet(result.diet);
       setAiLoading(false);
     })();
   };
@@ -168,6 +188,15 @@ export function HomeScreen() {
   if (view === 'coach') {
     return <CoachScreen onBack={() => setView('home')} />;
   }
+  if (view === 'calendar') {
+    return <CalendarScreen onBack={() => setView('home')} />;
+  }
+  if (view === 'weekly') {
+    return <WeeklyReportScreen onBack={() => setView('home')} />;
+  }
+  if (view === 'grocery') {
+    return <GroceryScreen onBack={() => setView('home')} />;
+  }
 
   const listHeader = (
     <View style={styles.headerBlock}>
@@ -186,6 +215,32 @@ export function HomeScreen() {
           accessibilityLabel="Open coach"
         >
           <Text style={styles.coachLinkText}>Coach →</Text>
+        </Pressable>
+      </View>
+      <View style={styles.btnRow2}>
+        <Pressable
+          style={styles.smallNav}
+          onPress={() => setCraveOpen(true)}
+        >
+          <Text style={styles.smallNavT}>Craving 😈</Text>
+        </Pressable>
+        <Pressable
+          style={styles.smallNav}
+          onPress={() => setView('calendar')}
+        >
+          <Text style={styles.smallNavT}>Calendar 📅</Text>
+        </Pressable>
+        <Pressable
+          style={styles.smallNav}
+          onPress={() => setView('weekly')}
+        >
+          <Text style={styles.smallNavT}>Weekly Report 📉</Text>
+        </Pressable>
+        <Pressable
+          style={styles.smallNav}
+          onPress={() => setView('grocery')}
+        >
+          <Text style={styles.smallNavT}>Grocery</Text>
         </Pressable>
       </View>
       <View style={styles.focusSection}>
@@ -272,6 +327,10 @@ export function HomeScreen() {
         onClose={() => setConfessOpen(false)}
         onSubmit={handleConfessionSubmit}
       />
+      <CravingModal
+        visible={craveOpen}
+        onClose={() => setCraveOpen(false)}
+      />
     </View>
   );
 }
@@ -329,6 +388,20 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  btnRow2: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: 10,
+  },
+  smallNav: {
+    backgroundColor: '#151515',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  smallNavT: { color: '#A7F3D0', fontSize: 13, fontWeight: '600' },
   focusSection: {
     backgroundColor: '#111111',
     borderRadius: 12,

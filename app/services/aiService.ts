@@ -1,5 +1,6 @@
 import type { AIResponse, ContextData, DietPlan } from '../types/ai';
 import type { CoachContextData, CoachResponse } from '../types/coach';
+import type { GroceryItem, WeeklyReport, WeeklyReportContext } from '../types/weekly';
 
 const OPENAI_BASE = 'https://api.openai.com/v1/chat/completions';
 
@@ -386,6 +387,158 @@ ${JSON.stringify(contextData)}`;
   const out = parseCoachFromUnknown(parsed);
   if (out) return out;
   return coachFallbackResponse();
+}
+
+const WEEKLY_REALITY_SYSTEM = `${GRINDMODE_SYSTEM_PREPROMPT}
+
+---
+### WEEKLY REALITY CHECK (OVERRIDES DIET / COACH JSON ABOVE)
+
+For THIS response only, output EXACTLY one JSON object, nothing else:
+{
+  "summary": "string",
+  "improvements": ["string", ...],
+  "next_strategy": "string"
+}
+No markdown, no extra keys.`;
+
+const WEEKLY_USER_LINE = `Analyze the user's last 7 days performance and give a strict reality check.`;
+
+const GROCERY_LIST_SYSTEM = `${GRINDMODE_SYSTEM_PREPROMPT}
+
+---
+### GROCERY LIST (OVERRIDES ABOVE)
+
+For THIS response only, output EXACTLY one JSON object: { "items": [ { "name": "string", "quantity": "string" }, ... ] }
+Items must map to the given diet plan, Indian-friendly, practical. No other keys, no markdown.`;
+
+function parseWeeklyFromUnknown(raw: unknown): WeeklyReport | null {
+  if (!isRecord(raw)) return null;
+  const s = raw.summary;
+  const imp = raw.improvements;
+  const n = raw.next_strategy;
+  if (typeof s !== 'string' || !isStringArray(imp) || typeof n !== 'string') {
+    return null;
+  }
+  return { summary: s, improvements: imp, next_strategy: n };
+}
+
+function weeklyFallback(): WeeklyReport {
+  return {
+    summary: 'Data missing. The week still counts — tighten up next week or stay soft.',
+    improvements: [
+      'Hit protein and steps daily.',
+      'Zero skipped workouts.',
+    ],
+    next_strategy: 'Log every meal and every session. No negotiation.',
+  };
+}
+
+function parseGroceryArray(raw: unknown): GroceryItem[] | null {
+  if (!isRecord(raw)) return null;
+  const items = raw.items;
+  if (!Array.isArray(items)) return null;
+  const out: GroceryItem[] = [];
+  for (const it of items) {
+    if (!isRecord(it)) return null;
+    if (typeof it.name !== 'string' || typeof it.quantity !== 'string') {
+      return null;
+    }
+    out.push({ name: it.name, quantity: it.quantity });
+  }
+  return out.length > 0 ? out : null;
+}
+
+function groceryFallback(): GroceryItem[] {
+  return [
+    { name: 'Eggs or paneer', quantity: 'as per plan' },
+    { name: 'Oats / roti atta', quantity: '1 week' },
+  ];
+}
+
+type ChatCompletions = {
+  choices?: { message?: { content?: string } }[];
+};
+
+async function callOpenAIJson(
+  system: string,
+  user: string
+): Promise<string | null> {
+  const apiKey = getOpenAIApiKey();
+  if (!apiKey) return null;
+  const body = {
+    model: 'gpt-4o-mini',
+    temperature: 0.7,
+    response_format: { type: 'json_object' as const },
+    messages: [
+      { role: 'system' as const, content: system },
+      { role: 'user' as const, content: user },
+    ],
+  };
+  let res: Response;
+  try {
+    res = await fetch(OPENAI_BASE, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    return null;
+  }
+  if (!res.ok) return null;
+  let json: ChatCompletions;
+  try {
+    json = (await res.json()) as ChatCompletions;
+  } catch {
+    return null;
+  }
+  const c = json.choices?.[0]?.message?.content;
+  return typeof c === 'string' && c.trim() ? c : null;
+}
+
+/**
+ * Last 7 days: strict JSON weekly reality check.
+ */
+export async function generateWeeklyReport(
+  context: WeeklyReportContext
+): Promise<WeeklyReport> {
+  const user = `${WEEKLY_USER_LINE}
+
+Context (JSON):
+${JSON.stringify(context)}`;
+  const content = await callOpenAIJson(WEEKLY_REALITY_SYSTEM, user);
+  if (!content) return weeklyFallback();
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(extractJsonString(content)) as unknown;
+  } catch {
+    return weeklyFallback();
+  }
+  const out = parseWeeklyFromUnknown(parsed);
+  return out ?? weeklyFallback();
+}
+
+/**
+ * Build shopping list for a given diet plan. Returns strict JSON list.
+ */
+export async function generateGroceryList(
+  dietPlan: DietPlan
+): Promise<GroceryItem[]> {
+  const user = `Diet plan (JSON):
+${JSON.stringify(dietPlan)}`;
+  const content = await callOpenAIJson(GROCERY_LIST_SYSTEM, user);
+  if (!content) return groceryFallback();
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(extractJsonString(content)) as unknown;
+  } catch {
+    return groceryFallback();
+  }
+  const out = parseGroceryArray(parsed);
+  return out ?? groceryFallback();
 }
 
 export { FALLBACK_MESSAGE };
