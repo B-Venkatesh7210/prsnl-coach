@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { ConfessionEntry } from '../types/ai';
 import type { Task } from '../types/task';
 
 const KEY = 'TASKS';
@@ -7,6 +8,7 @@ export interface PersistedTaskState {
   tasks: Task[];
   completedTasks: Task[];
   missedTasks: Task[];
+  confessions?: ConfessionEntry[];
 }
 
 /**

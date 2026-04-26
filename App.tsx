@@ -23,18 +23,23 @@ export default function App() {
           loaded.missedTasks.length > 0);
 
       if (hasAny && loaded) {
-        useTaskStore.setState(loaded);
+        useTaskStore.setState({
+          ...loaded,
+          confessions: loaded.confessions ?? [],
+        });
       } else {
         const fresh = generateDailyTasks();
         useTaskStore.setState({
           tasks: fresh,
           completedTasks: [],
           missedTasks: [],
+          confessions: [],
         });
         await saveTasksToStorage({
           tasks: fresh,
           completedTasks: [],
           missedTasks: [],
+          confessions: [],
         });
       }
       setReady(true);
@@ -51,6 +56,7 @@ export default function App() {
         tasks: state.tasks,
         completedTasks: state.completedTasks,
         missedTasks: state.missedTasks,
+        confessions: state.confessions,
       });
     });
   }, [ready]);
