@@ -26,6 +26,8 @@ export default function App() {
         useTaskStore.setState({
           ...loaded,
           confessions: loaded.confessions ?? [],
+          lockIn: loaded.lockIn ?? false,
+          tomorrowAdjustments: loaded.tomorrowAdjustments ?? [],
         });
       } else {
         const fresh = generateDailyTasks();
@@ -34,12 +36,16 @@ export default function App() {
           completedTasks: [],
           missedTasks: [],
           confessions: [],
+          lockIn: false,
+          tomorrowAdjustments: [],
         });
         await saveTasksToStorage({
           tasks: fresh,
           completedTasks: [],
           missedTasks: [],
           confessions: [],
+          lockIn: false,
+          tomorrowAdjustments: [],
         });
       }
       setReady(true);
@@ -57,6 +63,8 @@ export default function App() {
         completedTasks: state.completedTasks,
         missedTasks: state.missedTasks,
         confessions: state.confessions,
+        lockIn: state.lockIn,
+        tomorrowAdjustments: state.tomorrowAdjustments,
       });
     });
   }, [ready]);

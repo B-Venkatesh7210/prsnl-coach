@@ -13,6 +13,7 @@ import dayjs from 'dayjs';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
 import { TaskCard } from '../components/TaskCard';
 import { ConfessionModal } from '../components/ConfessionModal';
+import { CoachScreen } from './CoachScreen';
 import { generateNextDayDiet } from '../services/aiService';
 import {
   cancelAllNotifications,
@@ -93,9 +94,11 @@ function buildCompletionContext(): {
 }
 
 export function HomeScreen() {
+  const [view, setView] = useState<'home' | 'coach'>('home');
   const tasks = useTaskStore((s) => s.tasks);
   const completedTasks = useTaskStore((s) => s.completedTasks);
   const missedTasks = useTaskStore((s) => s.missedTasks);
+  const tomorrowAdjustments = useTaskStore((s) => s.tomorrowAdjustments);
   const addConfession = useTaskStore((s) => s.addConfession);
 
   const sections = useMemo(
@@ -162,16 +165,43 @@ export function HomeScreen() {
     </Text>
   );
 
+  if (view === 'coach') {
+    return <CoachScreen onBack={() => setView('home')} />;
+  }
+
   const listHeader = (
     <View style={styles.headerBlock}>
       <Text style={styles.heading}>GrindMode</Text>
-      <Pressable
-        style={styles.confessBtn}
-        onPress={() => setConfessOpen(true)}
-        accessibilityLabel="Open confession"
-      >
-        <Text style={styles.confessBtnText}>Confess 😈</Text>
-      </Pressable>
+      <View style={styles.btnRow}>
+        <Pressable
+          style={styles.confessBtn}
+          onPress={() => setConfessOpen(true)}
+          accessibilityLabel="Open confession"
+        >
+          <Text style={styles.confessBtnText}>Confess 😈</Text>
+        </Pressable>
+        <Pressable
+          style={styles.coachLink}
+          onPress={() => setView('coach')}
+          accessibilityLabel="Open coach"
+        >
+          <Text style={styles.coachLinkText}>Coach →</Text>
+        </Pressable>
+      </View>
+      <View style={styles.focusSection}>
+        <Text style={styles.focusTitle}>Tomorrow Focus</Text>
+        {tomorrowAdjustments.length > 0 ? (
+          tomorrowAdjustments.map((a, i) => (
+            <Text key={i} style={styles.focusItem}>
+              • {a}
+            </Text>
+          ))
+        ) : (
+          <Text style={styles.focusEmpty}>
+            Get coach feedback to set micro-adjustments.
+          </Text>
+        )}
+      </View>
       {aiLoading ? (
         <View style={styles.aiRow}>
           <ActivityIndicator color="#EAB308" />
@@ -268,18 +298,60 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     marginBottom: 12,
   },
+  btnRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
   confessBtn: {
-    alignSelf: 'flex-start',
     backgroundColor: '#1A1A1A',
     borderRadius: 12,
     paddingVertical: 12,
     paddingHorizontal: 16,
-    marginBottom: 16,
+    marginRight: 10,
+    marginBottom: 8,
   },
   confessBtnText: {
     color: '#EAB308',
     fontSize: 16,
     fontWeight: '600',
+  },
+  coachLink: {
+    backgroundColor: '#1A1A1A',
+    borderRadius: 12,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    marginBottom: 8,
+  },
+  coachLinkText: {
+    color: '#94A3B8',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  focusSection: {
+    backgroundColor: '#111111',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#2A2A2A',
+  },
+  focusTitle: {
+    color: '#EAB308',
+    fontSize: 15,
+    fontWeight: '700',
+    marginBottom: 8,
+  },
+  focusItem: {
+    color: 'rgba(255,255,255,0.9)',
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 4,
+  },
+  focusEmpty: {
+    color: 'rgba(255,255,255,0.4)',
+    fontSize: 14,
   },
   aiRow: {
     flexDirection: 'row',

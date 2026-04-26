@@ -9,6 +9,8 @@ export interface PersistedTaskState {
   completedTasks: Task[];
   missedTasks: Task[];
   confessions?: ConfessionEntry[];
+  lockIn?: boolean;
+  tomorrowAdjustments?: string[];
 }
 
 /**

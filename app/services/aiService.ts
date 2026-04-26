@@ -1,4 +1,5 @@
 import type { AIResponse, ContextData, DietPlan } from '../types/ai';
+import type { CoachContextData, CoachResponse } from '../types/coach';
 
 const OPENAI_BASE = 'https://api.openai.com/v1/chat/completions';
 
@@ -140,6 +141,25 @@ You are not a general assistant.
 You are a strict coach responsible for results.
 Do not compromise.`;
 
+const COACH_DAILY_FEEDBACK_SYSTEM = `${GRINDMODE_SYSTEM_PREPROMPT}
+
+---
+### COACH DAILY FEEDBACK (THIS REQUEST OVERRIDES THE DIET JSON BLOCK ABOVE)
+
+Ignore the "diet" + "adjustments" meal JSON schema for this request.
+
+For THIS response, output EXACTLY one valid JSON object and nothing else:
+{
+  "feedback": "string",
+  "tomorrow_adjustments": ["string", "string", ...]
+}
+
+- "feedback": one aggressive, direct paragraph on today's numbers and behavior.
+- "tomorrow_adjustments": 2–6 short, actionable micro-adjustments for tomorrow (no diet meal grid).
+No markdown, no code fences, no extra keys.`;
+
+const COACH_USER_INTRO = `Analyze today's performance and give strict feedback. Also suggest small improvements for tomorrow.`;
+
 function getOpenAIApiKey(): string | null {
   const a = process.env.EXPO_PUBLIC_OPENAI_API_KEY;
   const b = process.env.OPENAI_API_KEY;
@@ -186,6 +206,24 @@ function parseDietFromUnknown(raw: unknown): AIResponse | null {
     diet[k] = v;
   }
   return { diet: diet as DietPlan, adjustments: adj };
+}
+
+function parseCoachFromUnknown(raw: unknown): CoachResponse | null {
+  if (!isRecord(raw)) return null;
+  const f = raw.feedback;
+  const ta = raw.tomorrow_adjustments;
+  if (typeof f !== 'string' || !isStringArray(ta)) return null;
+  return { feedback: f, tomorrow_adjustments: ta };
+}
+
+function coachFallbackResponse(): CoachResponse {
+  return {
+    feedback:
+      'Data unavailable. Default rule: you still owe yourself execution tomorrow.',
+    tomorrow_adjustments: [
+      'Stick to clean, high-protein meals tomorrow. No half measures.',
+    ],
+  };
 }
 
 /**
@@ -276,6 +314,78 @@ export async function generateNextDayDiet(
   const out = parseDietFromUnknown(parsed);
   if (out) return out;
   return fallbackResponse();
+}
+
+/**
+ * Daily coach: strict feedback + small tomorrow tweaks. Same API setup as diet call.
+ */
+export async function generateDailyCoachFeedback(
+  contextData: CoachContextData
+): Promise<CoachResponse> {
+  const apiKey = getOpenAIApiKey();
+  if (!apiKey) {
+    return coachFallbackResponse();
+  }
+
+  const userContent = `${COACH_USER_INTRO}
+
+Context (JSON):
+${JSON.stringify(contextData)}`;
+
+  const body = {
+    model: 'gpt-4o-mini',
+    temperature: 0.7,
+    response_format: { type: 'json_object' as const },
+    messages: [
+      { role: 'system' as const, content: COACH_DAILY_FEEDBACK_SYSTEM },
+      { role: 'user' as const, content: userContent },
+    ],
+  };
+
+  let res: Response;
+  try {
+    res = await fetch(OPENAI_BASE, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify(body),
+    });
+  } catch {
+    return coachFallbackResponse();
+  }
+
+  if (!res.ok) {
+    return coachFallbackResponse();
+  }
+
+  type ChatCompletions = {
+    choices?: { message?: { content?: string } }[];
+  };
+
+  let json: ChatCompletions;
+  try {
+    json = (await res.json()) as ChatCompletions;
+  } catch {
+    return coachFallbackResponse();
+  }
+
+  const content = json.choices?.[0]?.message?.content;
+  if (typeof content !== 'string' || !content.trim()) {
+    return coachFallbackResponse();
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(extractJsonString(content)) as unknown;
+  } catch {
+    return coachFallbackResponse();
+  }
+
+  const out = parseCoachFromUnknown(parsed);
+  if (out) return out;
+  return coachFallbackResponse();
 }
 
 export { FALLBACK_MESSAGE };

@@ -13,8 +13,12 @@ type TaskStoreState = {
   completedTasks: Task[];
   missedTasks: Task[];
   confessions: ConfessionEntry[];
+  lockIn: boolean;
+  tomorrowAdjustments: string[];
   setTasks: (tasks: Task[]) => void;
   addConfession: (c: ConfessionInput) => void;
+  setLockIn: (value: boolean) => void;
+  setTomorrowAdjustments: (items: string[]) => void;
   completeTask: (taskId: string) => void;
   missTask: (taskId: string) => void;
   resetDay: () => void;
@@ -29,8 +33,14 @@ export const useTaskStore = create<TaskStoreState>((set) => ({
   completedTasks: [],
   missedTasks: [],
   confessions: [],
+  lockIn: false,
+  tomorrowAdjustments: [],
 
   setTasks: (tasks) => set({ tasks }),
+
+  setLockIn: (value) => set({ lockIn: value }),
+
+  setTomorrowAdjustments: (items) => set({ tomorrowAdjustments: items }),
 
   addConfession: (payload) =>
     set((state) => {
