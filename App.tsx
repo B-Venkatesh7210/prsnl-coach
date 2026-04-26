@@ -1,20 +1,77 @@
+import { useEffect, useState } from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { StyleSheet, Text, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { HomeScreen } from './app/screens/HomeScreen';
+import { useTaskStore } from './app/store/useTaskStore';
+import { generateDailyTasks } from './app/utils/routineGenerator';
+import { loadTasksFromStorage, saveTasksToStorage } from './app/utils/storage';
 
 export default function App() {
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const loaded = await loadTasksFromStorage();
+      if (cancelled) return;
+
+      const hasAny =
+        loaded != null &&
+        (loaded.tasks.length > 0 ||
+          loaded.completedTasks.length > 0 ||
+          loaded.missedTasks.length > 0);
+
+      if (hasAny && loaded) {
+        useTaskStore.setState(loaded);
+      } else {
+        const fresh = generateDailyTasks();
+        useTaskStore.setState({
+          tasks: fresh,
+          completedTasks: [],
+          missedTasks: [],
+        });
+        await saveTasksToStorage({
+          tasks: fresh,
+          completedTasks: [],
+          missedTasks: [],
+        });
+      }
+      setReady(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!ready) return;
+    return useTaskStore.subscribe((state) => {
+      void saveTasksToStorage({
+        tasks: state.tasks,
+        completedTasks: state.completedTasks,
+        missedTasks: state.missedTasks,
+      });
+    });
+  }, [ready]);
+
   return (
-    <View style={styles.container}>
-      <Text>Open up App.tsx to start working on your app!</Text>
-      <StatusBar style="auto" />
-    </View>
+    <GestureHandlerRootView style={styles.root}>
+      <View style={styles.inner}>
+        {ready ? <HomeScreen /> : null}
+        <StatusBar style="light" />
+      </View>
+    </GestureHandlerRootView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
+  root: {
     flex: 1,
-    backgroundColor: '#fff',
-    alignItems: 'center',
-    justifyContent: 'center',
+    backgroundColor: '#0D0D0D',
+  },
+  inner: {
+    flex: 1,
+    backgroundColor: '#0D0D0D',
   },
 });
