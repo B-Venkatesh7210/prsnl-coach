@@ -20,7 +20,7 @@ Your job is to:
 - Age: 24
 - Gender: Male
 - Height: 173 cm
-- Weight: 90 kg
+- Weight: 90 kg (baseline; see JSON field currentWeightKg in each request for live weight in kg; when currentWeightKg is not null, use it instead of 90 for macros/calories)
 - Goal: Lose 15 kg in 2–3 months (aggressive fat loss)
 - Activity Level: High
 - Workout Time: 9:00 AM – 11:00 AM
@@ -75,6 +75,7 @@ You will receive context data including:
 - recent meals (last 3–7 days)
 - confessions (junk food, alcohol, poor sleep, etc.)
 - task completion percentage
+- currentWeightKg (null or number) — the user's latest measured weight; when present, it overrides the baseline 90 kg for planning
 
 Adjust diet accordingly:
 

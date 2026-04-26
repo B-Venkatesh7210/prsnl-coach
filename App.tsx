@@ -35,6 +35,7 @@ export default function App() {
             loaded.currentWeightKg === undefined
               ? null
               : loaded.currentWeightKg,
+          dietRecheckAfterWeight: loaded.dietRecheckAfterWeight ?? false,
           lastWeeklyReport: loaded.lastWeeklyReport ?? null,
         });
       } else {
@@ -50,6 +51,7 @@ export default function App() {
           lastDiet: null,
           groceryList: [],
           currentWeightKg: null,
+          dietRecheckAfterWeight: false,
           lastWeeklyReport: null,
         });
         await saveTasksToStorage({
@@ -63,6 +65,7 @@ export default function App() {
           lastDiet: null,
           groceryList: [],
           currentWeightKg: null,
+          dietRecheckAfterWeight: false,
           lastWeeklyReport: null,
         });
       }
@@ -87,6 +90,7 @@ export default function App() {
         lastDiet: state.lastDiet,
         groceryList: state.groceryList,
         currentWeightKg: state.currentWeightKg,
+        dietRecheckAfterWeight: state.dietRecheckAfterWeight,
         lastWeeklyReport: state.lastWeeklyReport,
       });
     });

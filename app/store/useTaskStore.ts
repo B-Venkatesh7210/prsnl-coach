@@ -20,6 +20,8 @@ type TaskStoreState = {
   lastDiet: DietPlan | null;
   groceryList: GroceryListRow[];
   currentWeightKg: number | null;
+  /** True after currentWeightKg changes until user refreshes the diet or dismisses. */
+  dietRecheckAfterWeight: boolean;
   lastWeeklyReport: WeeklyReport | null;
 
   setTasks: (tasks: Task[]) => void;
@@ -34,6 +36,7 @@ type TaskStoreState = {
   importGroceryFromAI: (items: GroceryItem[]) => void;
   toggleGroceryBought: (id: string) => void;
   setCurrentWeight: (kg: number | null) => void;
+  clearDietRecheckAfterWeight: () => void;
   setLastWeeklyReport: (r: WeeklyReport | null) => void;
 
   completeTask: (taskId: string) => void;
@@ -60,6 +63,7 @@ export const useTaskStore = create<TaskStoreState>((set) => ({
   lastDiet: null,
   groceryList: [],
   currentWeightKg: null,
+  dietRecheckAfterWeight: false,
   lastWeeklyReport: null,
 
   setTasks: (tasks) => set({ tasks }),
@@ -125,7 +129,25 @@ export const useTaskStore = create<TaskStoreState>((set) => ({
       ),
     })),
 
-  setCurrentWeight: (kg) => set({ currentWeightKg: kg }),
+  setCurrentWeight: (kg) =>
+    set((state) => {
+      const prev = state.currentWeightKg;
+      const a = prev;
+      const b = kg;
+      const same =
+        (a == null && b == null) ||
+        (typeof a === 'number' &&
+          typeof b === 'number' &&
+          Math.abs(a - b) < 0.01);
+      return {
+        currentWeightKg: kg,
+        dietRecheckAfterWeight: same
+          ? state.dietRecheckAfterWeight
+          : true,
+      };
+    }),
+
+  clearDietRecheckAfterWeight: () => set({ dietRecheckAfterWeight: false }),
 
   setLastWeeklyReport: (r) => set({ lastWeeklyReport: r }),
 

@@ -16,6 +16,7 @@ export interface PersistedTaskState {
   lastDiet?: DietPlan | null;
   groceryList?: GroceryListRow[];
   currentWeightKg?: number | null;
+  dietRecheckAfterWeight?: boolean;
   lastWeeklyReport?: WeeklyReport | null;
 }
 

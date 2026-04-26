@@ -26,4 +26,6 @@ export type ContextData = {
   lastMeals: string[];
   confessions: { type: string; details: string; severity: string }[];
   completionPercentage: number;
+  /** Current body weight in kg; drives diet targets when set. */
+  currentWeightKg: number | null;
 };

@@ -34,6 +34,7 @@ function buildCoachContext(): CoachContextData {
     completedTasks: st.completedTasks,
     missedTasks: st.missedTasks,
     confessions,
+    currentWeightKg: st.currentWeightKg,
   };
 }
 

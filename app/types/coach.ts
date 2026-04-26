@@ -13,4 +13,5 @@ export type CoachContextData = {
   completedTasks: Task[];
   missedTasks: Task[];
   confessions: { type: string; details: string; severity: string }[];
+  currentWeightKg: number | null;
 };

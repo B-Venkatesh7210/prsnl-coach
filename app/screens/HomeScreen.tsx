@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
+  Modal,
   Pressable,
   SectionList,
   SectionListData,
   SectionListRenderItem,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native';
 import dayjs from 'dayjs';
@@ -74,11 +76,7 @@ function buildSections(
   return [pending, done];
 }
 
-function buildCompletionContext(): {
-  lastMeals: string[];
-  confessions: { type: string; details: string; severity: string }[];
-  completionPercentage: number;
-} {
+function buildCompletionContext() {
   const st = useTaskStore.getState();
   const lastMeals = st.completedTasks
     .filter((t) => t.type === 'meal')
@@ -94,7 +92,12 @@ function buildCompletionContext(): {
     total === 0
       ? 0
       : Math.round((100 * st.completedTasks.length) / total);
-  return { lastMeals, confessions, completionPercentage };
+  return {
+    lastMeals,
+    confessions,
+    completionPercentage,
+    currentWeightKg: st.currentWeightKg,
+  };
 }
 
 export function HomeScreen() {
@@ -108,7 +111,15 @@ export function HomeScreen() {
   const addConfession = useTaskStore((s) => s.addConfession);
   const setLastDiet = useTaskStore((s) => s.setLastDiet);
   const setCompletion = useTaskStore((s) => s.setCompletion);
+  const currentWeightKg = useTaskStore((s) => s.currentWeightKg);
+  const setCurrentWeight = useTaskStore((s) => s.setCurrentWeight);
+  const dietRecheckAfterWeight = useTaskStore((s) => s.dietRecheckAfterWeight);
+  const clearDietRecheckAfterWeight = useTaskStore(
+    (s) => s.clearDietRecheckAfterWeight
+  );
   const [craveOpen, setCraveOpen] = useState(false);
+  const [weightModalOpen, setWeightModalOpen] = useState(false);
+  const [weightDraft, setWeightDraft] = useState('');
 
   const sections = useMemo(
     () => buildSections(tasks, completedTasks, missedTasks),
@@ -158,8 +169,43 @@ export function HomeScreen() {
       const result = await generateNextDayDiet(ctx);
       setTomorrowPlan(result);
       setLastDiet(result.diet);
+      clearDietRecheckAfterWeight();
       setAiLoading(false);
     })();
+  };
+
+  const runRegenerateDietOnly = () => {
+    setAiLoading(true);
+    void (async () => {
+      const ctx = buildCompletionContext();
+      const result = await generateNextDayDiet(ctx);
+      setTomorrowPlan(result);
+      setLastDiet(result.diet);
+      clearDietRecheckAfterWeight();
+      setAiLoading(false);
+    })();
+  };
+
+  const openWeightModal = () => {
+    setWeightDraft(
+      currentWeightKg != null ? String(currentWeightKg) : ''
+    );
+    setWeightModalOpen(true);
+  };
+
+  const saveWeightFromModal = () => {
+    const t = weightDraft.trim();
+    if (t.length === 0) {
+      setCurrentWeight(null);
+      setWeightModalOpen(false);
+      return;
+    }
+    const n = parseFloat(t.replace(',', '.'));
+    if (!Number.isFinite(n) || n <= 0 || n >= 500) {
+      return;
+    }
+    setCurrentWeight(Math.round(n * 10) / 10);
+    setWeightModalOpen(false);
   };
 
   const renderItem: SectionListRenderItem<Task, Section> = ({
@@ -217,6 +263,40 @@ export function HomeScreen() {
           <Text style={styles.coachLinkText}>Coach →</Text>
         </Pressable>
       </View>
+      <Pressable
+        onPress={openWeightModal}
+        style={styles.weightRow}
+        accessibilityLabel="Edit current body weight"
+      >
+        <Text style={styles.weightLabel}>Current weight</Text>
+        <Text style={styles.weightValue}>
+          {currentWeightKg != null
+            ? `${currentWeightKg} kg`
+            : 'Tap to set (kg)'}
+        </Text>
+      </Pressable>
+      {dietRecheckAfterWeight ? (
+        <View style={styles.recheckBanner}>
+          <Text style={styles.recheckText}>
+            Your weight changed — refresh tomorrow&apos;s diet so targets match.
+          </Text>
+          <View style={styles.recheckRow}>
+            <Pressable
+              style={styles.recheckBtn}
+              onPress={runRegenerateDietOnly}
+              disabled={aiLoading}
+            >
+              <Text style={styles.recheckBtnT}>Update plan</Text>
+            </Pressable>
+            <Pressable
+              style={styles.recheckBtnGhost}
+              onPress={clearDietRecheckAfterWeight}
+            >
+              <Text style={styles.recheckBtnGhostT}>Not now</Text>
+            </Pressable>
+          </View>
+        </View>
+      ) : null}
       <View style={styles.btnRow2}>
         <Pressable
           style={styles.smallNav}
@@ -331,6 +411,40 @@ export function HomeScreen() {
         visible={craveOpen}
         onClose={() => setCraveOpen(false)}
       />
+      <Modal
+        visible={weightModalOpen}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setWeightModalOpen(false)}
+      >
+        <View style={styles.modOverlay}>
+          <View style={styles.modCard}>
+            <Text style={styles.modTitle}>Body weight (kg)</Text>
+            <Text style={styles.modHint}>
+              Used in diet and coach context. Clear field to remove.
+            </Text>
+            <TextInput
+              value={weightDraft}
+              onChangeText={setWeightDraft}
+              keyboardType="decimal-pad"
+              placeholder="e.g. 88.5"
+              placeholderTextColor="rgba(255,255,255,0.35)"
+              style={styles.modInput}
+            />
+            <View style={styles.modBtns}>
+              <Pressable
+                style={styles.modCancel}
+                onPress={() => setWeightModalOpen(false)}
+              >
+                <Text style={styles.modCancelT}>Cancel</Text>
+              </Pressable>
+              <Pressable style={styles.modSave} onPress={saveWeightFromModal}>
+                <Text style={styles.modSaveT}>Save</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -388,6 +502,87 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
   },
+  weightRow: {
+    backgroundColor: '#111111',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: '#2A2A2A',
+  },
+  weightLabel: {
+    color: 'rgba(255,255,255,0.5)',
+    fontSize: 12,
+    marginBottom: 4,
+  },
+  weightValue: { color: '#A7F3D0', fontSize: 16, fontWeight: '600' },
+  recheckBanner: {
+    backgroundColor: 'rgba(234,179,8,0.1)',
+    borderRadius: 12,
+    padding: 14,
+    marginBottom: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(234,179,8,0.45)',
+  },
+  recheckText: {
+    color: 'rgba(255,255,255,0.88)',
+    fontSize: 14,
+    lineHeight: 20,
+    marginBottom: 12,
+  },
+  recheckRow: { flexDirection: 'row', flexWrap: 'wrap' },
+  recheckBtn: {
+    backgroundColor: '#EAB308',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    marginRight: 10,
+    marginBottom: 4,
+  },
+  recheckBtnT: { color: '#0D0D0D', fontWeight: '700', fontSize: 14 },
+  recheckBtnGhost: {
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.3)',
+  },
+  recheckBtnGhostT: { color: 'rgba(255,255,255,0.8)', fontSize: 14 },
+  modOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    justifyContent: 'center',
+    paddingHorizontal: 24,
+  },
+  modCard: {
+    backgroundColor: '#1A1A1A',
+    borderRadius: 16,
+    padding: 20,
+    borderWidth: 1,
+    borderColor: '#2A2A2A',
+  },
+  modTitle: { color: '#FFF', fontSize: 18, fontWeight: '700', marginBottom: 6 },
+  modHint: { color: 'rgba(255,255,255,0.5)', fontSize: 13, marginBottom: 12 },
+  modInput: {
+    backgroundColor: '#111',
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: '#333',
+    color: '#FFF',
+    fontSize: 16,
+    padding: 12,
+    marginBottom: 16,
+  },
+  modBtns: { flexDirection: 'row', justifyContent: 'flex-end' },
+  modCancel: { paddingVertical: 10, paddingHorizontal: 14, marginRight: 8 },
+  modCancelT: { color: 'rgba(255,255,255,0.6)', fontSize: 16 },
+  modSave: {
+    backgroundColor: '#EAB308',
+    borderRadius: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 20,
+  },
+  modSaveT: { color: '#0D0D0D', fontSize: 16, fontWeight: '700' },
   btnRow2: {
     flexDirection: 'row',
     flexWrap: 'wrap',
