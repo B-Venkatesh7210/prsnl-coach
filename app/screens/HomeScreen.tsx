@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import {
   SectionList,
   SectionListData,
@@ -9,6 +10,11 @@ import {
 import dayjs from 'dayjs';
 import customParseFormat from 'dayjs/plugin/customParseFormat';
 import { TaskCard } from '../components/TaskCard';
+import {
+  cancelAllNotifications,
+  requestNotificationPermission,
+  scheduleDailyNotifications,
+} from '../services/notificationService';
 import { useTaskStore } from '../store/useTaskStore';
 import type { Task } from '../types/task';
 
@@ -63,6 +69,23 @@ export function HomeScreen() {
   const completedTasks = useTaskStore((s) => s.completedTasks);
   const missedTasks = useTaskStore((s) => s.missedTasks);
   const sections = buildSections(tasks, completedTasks, missedTasks);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const allowed = await requestNotificationPermission();
+      if (cancelled) return;
+      const pending = useTaskStore.getState().tasks;
+      await cancelAllNotifications();
+      if (cancelled) return;
+      if (allowed) {
+        await scheduleDailyNotifications(pending);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [tasks]);
 
   const renderItem: SectionListRenderItem<Task, Section> = ({ item, section }) => (
     <TaskCard
